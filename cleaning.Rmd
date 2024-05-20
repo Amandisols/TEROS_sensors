@@ -70,40 +70,40 @@ for (i in 1:length(file_list)) {
     dat <- read_excel(file_list[i], col_names = FALSE, skip= 3)
     
     #Create a log of logger serial numbers and what it is measuring
-    log <- read_excel(file_list[i], sheet = "Metadata")
+    smlog <- read_excel(file_list[i], sheet = "Metadata")
     
-    loggerID <- subset(log, log$`Device Name` == "Serial Number")
+    loggerID <- subset(smlog, smlog$`Device Name` == "Serial Number")
     loggerID <- as.character(loggerID[1,3])
     
-    date <- subset(log, log$`Device Name` == "Logger Time")
+    date <- subset(smlog, smlog$`Device Name` == "Logger Time")
     date <- as.Date(as.character(date[1,3]), "%m/%d/%y")
     mo <- as.character(month(as.POSIXlt(date, format="%d/%m/%Y"), label = T))
     yr <- as.character(year(as.POSIXlt(date, format="%d/%m/%Y")))
     download_date = paste0(mo, yr)
     
-    row <- as.numeric(which(grepl("Sensors", log$Configuration)))
+    row <- as.numeric(which(grepl("Sensors", smlog$Configuration)))
   
-    log <- log %>% 
-      slice(row:nrow(log)) %>%
+    smlog <- smlog %>% 
+      slice(row:nrow(smlog)) %>%
       filter(`Device Name` %in% c("Port #", "Name", "Serial Num", "Serial Number")) %>%
       select(-Configuration) 
   
-    names(log)[1] = "key"
-    names(log)[2] = "value"
-    log[is.na(log)] <- "9999"
-    log <- do.call(data.frame, aggregate(. ~ key, log, as.vector))
-    log <- as.data.frame(t(log))
-    colnames(log) <- log[1,]
-    log <- log[-1,]
-    log$model <- word(log$Name, start = 1, end = 2)
+    names(smlog)[1] = "key"
+    names(smlog)[2] = "value"
+    smlog[is.na(smlog)] <- "9999"
+    smlog <- do.call(data.frame, aggregate(. ~ key, smlog, as.vector))
+    smlog <- as.data.frame(t(smlog))
+    colnames(smlog) <- smlog[1,]
+    smlog <- smlog[-1,]
+    smlog$model <- word(smlog$Name, start = 1, end = 2)
   
-    log <- log  %>%
+    smlog <- smlog  %>%
       mutate(meas = if_else(model == "TEROS 21", 
                             list(c("matric_kPa", "matric_temp_C")), 
                             list(c("vwc", "vwc_temp_C", "satext_mScm")))) %>%
       unnest(meas) 
     
-    names(log)[3] <- "serial"
+    names(smlog)[3] <- "serial"
   
     
     #Headers of the datafile
@@ -129,7 +129,7 @@ for (i in 1:length(file_list)) {
     header$meas <- ifelse(header$meas == "°C Logger Temperature",  paste0("logger", "_", "tempC"), header$meas)
   
     
-    #join metadata with log to get depths of the sensors
+    #join metadata with smlog to get depths of the sensors
     metaL <- meta
     metaL <- metaL %>% filter(logger == loggerID)
     
@@ -140,16 +140,16 @@ for (i in 1:length(file_list)) {
     metaL$dup_depth <- do.call(paste, c(metaL[my_cols], sep = ""))
     metaL <- metaL %>% select(siteID, logger, serial, dup_depth) 
     
-    log <- left_join(log, metaL, by = "serial")
-    names(log)[2] = "port"
-    log$port <- as.numeric(log$port)
+    smlog <- left_join(smlog, metaL, by = "serial")
+    names(smlog)[2] = "port"
+    smlog$port <- as.numeric(smlog$port)
     
     #port
     header$port <- as.numeric(str_extract(header$port, "\\d"))
     header$port <- ifelse(header$meas == "datetime", NA, header$port)
     
     #join log with header information
-    header <- left_join(header, log, by = c("port", "meas"))
+    header <- left_join(header, smlog, by = c("port", "meas"))
     
     my_cols <- c("meas", "dup_depth")
     header$colnames <- do.call(paste, c(header[my_cols], sep = "_"))
