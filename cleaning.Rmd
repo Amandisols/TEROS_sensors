@@ -1,5 +1,5 @@
 ---
-title: "Untitled"
+title: "TEROS Datalogger and Sensor Data Processing"
 author: "Amanda Pennino"
 date: "2023-11-14"
 output: html_document
@@ -31,13 +31,11 @@ clean_dir <- paste0(dir, "clean/") #Clean files by download date
 dir.create(file.path(dir, "master"), showWarnings = TRUE)
 master_dir <- paste0(dir, "master/") #Clean files by location with all dates appended
 
-
 # Metadata file structure
 ## columns needed: loggerID, site, depth_cm, duplicate_depth, serial 
 meta <- read_csv(paste0(dir,"sensor_metadata.csv"))
 
 ```
-
 
 # Maps of sensor location
 ```{r}
@@ -54,9 +52,7 @@ mapview(Coweeta, label = Coweeta$WS) +
 
 ```
 
-
-# Clean raw data
-## Make sure metadata file has download dates and serial numbers filled out
+# Clean raw data and make sure metadata file has download dates and serial numbers filled out
 ```{r}
 
 out = clean_dir
@@ -167,7 +163,6 @@ for (i in 1:length(file_list)) {
 
 ```
 
-
 # Combine all download dates
 ```{r}
 
@@ -210,10 +205,7 @@ for(i in 1:length(dfList)){
 
 ```
 
-
-
-
-#Below this is just me playing around
+# Plot Some Data
 ```{r}
 read = master_dir
 
