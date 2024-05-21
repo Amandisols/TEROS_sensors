@@ -4,13 +4,6 @@ author: "Amanda Pennino"
 date: "2023-11-14"
 output: html_document
 ---
-To do:
-# SatExt -  bulk EC
-# units?
-# Weird date thing
-# Graphics to explore oddities and flag- interactive plot like I had in gw code
-
-
 # Libraries and directories
 ```{r}
 library(readxl)
