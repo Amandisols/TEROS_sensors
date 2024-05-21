@@ -225,20 +225,13 @@ dfList <- sapply(file_prefix, function(p){
                 
           }, simplify=FALSE)
 
-
-
 #format datetime column
 dfList <- lapply(dfList, transform, datetime = as.POSIXct(datetime, format = "%Y-%m-%d %H:%M:%S"))
-
-
 
 test <- dfList$Cw32C
 
 plot(test$datetime, test$vwc_79, type = "p")
 
-
-
-  
 ```
 
 
