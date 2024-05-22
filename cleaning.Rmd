@@ -234,7 +234,8 @@ ggplot(test, aes(x= datetime))+
   ylab("Volumetric Water Content")+
   ggtitle("VWC CW32C")+
   theme_minimal()
-  
+
+##ggplot MP  
 ggplot(test, aes(x= datetime, y = matric_kPa_79))+
   geom_line()+
   geom_line(aes(y= matric_kPa_15), color = "#d7191c")+
@@ -242,7 +243,8 @@ ggplot(test, aes(x= datetime, y = matric_kPa_79))+
   ylab("kPa")+
   ggtitle("Matric Potential CW32C")+
    theme_minimal()
-   
+
+##ggplot Soil Temperature
 ggplot(test, aes(x= datetime))+
   geom_line(aes(y= matric_temp_C_79), color = "green")+
   geom_line(aes(y= vwc_temp_C_79), color = "black")+
@@ -254,7 +256,8 @@ ggplot(test, aes(x= datetime))+
   ylab("°C")+
   ggtitle("Soil Temperature CW32C")+
   theme_minimal()
-   
+
+##ggplot Battery Status   
 ggplot(test, aes(x= datetime))+
   geom_line(aes(y=logger_battPerc))+
   xlab("Date")+
