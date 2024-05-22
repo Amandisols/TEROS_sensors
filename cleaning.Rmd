@@ -224,16 +224,43 @@ test <- dfList$Cw32C
 #plot
 plot(test$datetime, test$vwc_79, type = "p", pch=20)
 
-##ggplot
-ggplot(test, aes(x= datetime, y = vwc_79))+
-  geom_line()+
+##ggplot VWC
+ggplot(test, aes(x= datetime))+
+  geom_line(aes(y= vwc_79), color = "black")+
   geom_line(aes(y= vwc_50a), color = "#d7191c")+
   geom_line(aes(y= vwc_50b), color = "#e66101")+
   geom_line(aes(y= vwc_15), color = "#2c7bb6")+
   xlab("Date")+
   ylab("Volumetric Water Content")+
-  ggtitle("VWC CW32C")
+  ggtitle("VWC CW32C")+
   theme_minimal()
+  
+ggplot(test, aes(x= datetime, y = matric_kPa_79))+
+  geom_line()+
+  geom_line(aes(y= matric_kPa_15), color = "#d7191c")+
+  xlab("Date")+
+  ylab("kPa")+
+  ggtitle("Matric Potential CW32C")+
+   theme_minimal()
+   
+ggplot(test, aes(x= datetime))+
+  geom_line(aes(y= matric_temp_C_79), color = "green")+
+  geom_line(aes(y= vwc_temp_C_79), color = "black")+
+  geom_line(aes(y= vwc_temp_C_50a), color = "#d7191c")+
+  geom_line(aes(y= vwc_temp_C_50b), color = "#e66101")+
+  geom_line(aes(y= matric_temp_C_15), color = "#2c7bb6")+
+  geom_line(aes(y= vwc_temp_C_15), color = "blue")+
+  xlab("Date")+
+  ylab("°C")+
+  ggtitle("Soil Temperature CW32C")+
+  theme_minimal()
+   
+ggplot(test, aes(x= datetime))+
+  geom_line(aes(y=logger_battPerc))+
+  xlab("Date")+
+  ylab("Battery Percentage")+
+  ggtitle("Battery CW32C")+
+   theme_minimal()
 
 ```
 
