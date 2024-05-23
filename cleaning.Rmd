@@ -42,7 +42,7 @@ Coweeta <- st_read("~/projects/DSS/TEROS_sensors/Coweeta/shapefiles/Coweeta_Hydr
 mapview(Coweeta, label = Coweeta$WS) +
   mapview(points, label = points$siteID) 
 
-```
+ ```
 
 # Clean raw data and make sure metadata file has download dates and serial numbers filled out
 ```{r}
@@ -293,6 +293,43 @@ plot_battery_percentage <- function(dfList) {
   }
 
 plot_battery_percentage(dfList)
+
+
+plot_vwc <- function(dfList) {
+  if(!dir.exists("plots")){
+    dir.create("plots")
+  }
+  if(!dir.exists("plots/vwc_plots")) {
+    dir.create("plots/vwc_plots")
+    }
+ for(i in seq_along(dfList)){
+   df<- dfList[[i]]
+   df_name <- names(dfList)[i]
+   
+   vwc_columns <- grep("vwc_(?!temp)", names(df), value = TRUE, perl = TRUE)
+   if(length(vwc_columns)== 0) next
+      
+      df_melted<- df %>%
+      select(datetime, all_of(vwc_columns)) %>%
+      pivot_longer(cols = -datetime, names_to = "variable", values_to = "value")
+      
+      p<- ggplot(df_melted, aes(x = datetime, y = value, color = variable))+
+        geom_line()+
+        labs(title = paste("VWC -", df_name),
+             x = "Date", 
+             y = "VWC",
+             color = "VWC Variables")+
+        theme_minimal()+
+        theme(
+        plot.background = element_rect(fill = "white", color = NA),
+        panel.background = element_rect(fill = "white", color = NA)
+      )
+     ggsave(filename = paste0("plots/vwc_plots/vwc_plot_", df_name, ".png"), plot = p, width = 10, height = 5)
+      }
+  
+}
+
+plot_vwc(dfList)
 
 ```
 
