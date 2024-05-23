@@ -273,6 +273,10 @@ plot_battery_percentage <- function(dfList) {
   if(!dir.exists("plots")){
     dir.create("plots")
   }
+  if(!dir.exists("plots/battery_percentage")){
+    dir.create("plots/battery_percentage")
+  }
+  
   for(i in seq_along(dfList)){
     df<- dfList[[i]]
     df_name <- names(dfList)[i]
@@ -288,7 +292,7 @@ plot_battery_percentage <- function(dfList) {
         panel.background = element_rect(fill = "white", color = NA)
       )
     
-    ggsave(filename = paste0("plots/battery_percentage_plot_",df_name,".png"), plot = p, width = 10, height = 5)
+    ggsave(filename = paste0("plots/battery_percentage/battery_percentage_plot_",df_name,".png"), plot = p, width = 10, height = 5)
   }
   }
 
@@ -330,6 +334,46 @@ plot_vwc <- function(dfList) {
 }
 
 plot_vwc(dfList)
+
+
+
+plot_matricpotential <- function(dfList) {
+  if(!dir.exists("plots")){
+    dir.create("plots")
+  }
+  if(!dir.exists("plots/mp_plots")) {
+    dir.create("plots/mp_plots")
+    }
+ for(i in seq_along(dfList)){
+   df<- dfList[[i]]
+   df_name <- names(dfList)[i]
+   
+   mp_columns <- grep("matric_kPa", names(df), value = TRUE, perl = TRUE)
+   if(length(mp_columns)== 0) next
+      
+      df_melted<- df %>%
+      select(datetime, all_of(mp_columns)) %>%
+      pivot_longer(cols = -datetime, names_to = "variable", values_to = "value")
+      
+      p<- ggplot(df_melted, aes(x = datetime, y = value, color = variable))+
+        geom_line()+
+        labs(title = paste("Matric Potential -", df_name),
+             x = "Date", 
+             y = "Matric Potential",
+             color = "MP Variables")+
+        theme_minimal()+
+        theme(
+        plot.background = element_rect(fill = "white", color = NA),
+        panel.background = element_rect(fill = "white", color = NA)
+      )
+     ggsave(filename = paste0("plots/mp_plots/mp_plot_", df_name, ".png"), plot = p, width = 10, height = 5)
+      }
+  
+}
+
+plot_matricpotential(dfList)
+
+
 
 ```
 
