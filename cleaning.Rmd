@@ -23,7 +23,7 @@ raw_dir <- paste0(dir, "raw/") #Where raw files are in folders by download date
 
 dir.create(file.path(dir, "clean"), showWarnings = TRUE) 
 clean_dir <- paste0(dir, "clean/") #Clean files by download date
-
+ 
 dir.create(file.path(dir, "master"), showWarnings = TRUE)
 master_dir <- paste0(dir, "master/") #Clean files by location with all dates appended
 
@@ -267,4 +267,32 @@ ggplot(test, aes(x= datetime))+
 
 ```
 
+```{r}
+
+plot_battery_percentage <- function(dfList) {
+  if(!dir.exists("plots")){
+    dir.create("plots")
+  }
+  for(i in seq_along(dfList)){
+    df<- dfList[[i]]
+    df_name <- names(dfList)[i]
+    
+    p<- ggplot(df, aes(x= datetime, y = logger_battPerc)) +
+      geom_line() +
+      labs(title = paste("Battery Percentage ZL6 Pro",df_name),
+           x= "Date",
+           y= "Battery Percentage")+
+      theme_minimal()+
+      theme(
+        plot.background = element_rect(fill = "white", color = NA),
+        panel.background = element_rect(fill = "white", color = NA)
+      )
+    
+    ggsave(filename = paste0("plots/battery_percentage_plot_",df_name,".png"), plot = p, width = 10, height = 5)
+  }
+  }
+
+plot_battery_percentage(dfList)
+
+```
 
