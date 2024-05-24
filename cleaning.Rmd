@@ -41,16 +41,15 @@ Coweeta <- st_read("~/projects/DSS/TEROS_sensors/Coweeta/shapefiles/Coweeta_Hydr
 
 mapview(Coweeta, label = Coweeta$WS) +
   mapview(points, label = points$siteID) 
+```
 
- ```
-
+ 
 # Clean raw data and make sure metadata file has download dates and serial numbers filled out
 ```{r}
 
 out = clean_dir
 
 file_list <- list.files(path=raw_dir, full.names = TRUE, recursive = TRUE) 
-
 
 for (i in 1:length(file_list)) {
     
@@ -93,7 +92,6 @@ for (i in 1:length(file_list)) {
     
     names(smlog)[3] <- "serial"
   
-    
     #Headers of the datafile
     header <- read_excel(file_list[i], col_names = FALSE)
     header <- header[c(1:3),]
@@ -101,7 +99,6 @@ for (i in 1:length(file_list)) {
     names(header)[1] = "port"
     names(header)[2] = "model"
     names(header)[3] = "meas"
-    
     
     #unique(header$meas)
     header$meas <- ifelse(header$meas == "Timestamp", "datetime", header$meas)
@@ -116,7 +113,6 @@ for (i in 1:length(file_list)) {
     header$meas <- ifelse(header$meas == "kPa Reference Pressure",  paste0("logger", "_", "refPress"), header$meas)
     header$meas <- ifelse(header$meas == "°C Logger Temperature",  paste0("logger", "_", "tempC"), header$meas)
   
-    
     #join metadata with smlog to get depths of the sensors
     metaL <- meta
     metaL <- metaL %>% filter(logger == loggerID)
@@ -143,7 +139,6 @@ for (i in 1:length(file_list)) {
     header$colnames <- do.call(paste, c(header[my_cols], sep = "_"))
     header$colnames <- gsub("_NA", "",header$colname)
     header$colnames <- gsub("NA", "",header$colname)  
-    
     
     #Change the column names and write out
     colnames <- header$colnames
@@ -187,7 +182,8 @@ dfList <- lapply(dfList, function(x) x[!duplicated(x["datetime"]), ])
 #format datetime column
 dfList <- lapply(dfList, transform, datetime = as.POSIXct(datetime, format = "%Y-%m-%d %H:%M:%S"))
 
-
+## remove erroneous date values by filtering out dates past today
+dfList <- lapply(dfList, function(df) df[df$datetime <= Sys.Date(),])
 
 for(i in 1:length(dfList)){
   
@@ -273,8 +269,8 @@ plot_battery_percentage <- function(dfList) {
   if(!dir.exists("plots")){
     dir.create("plots")
   }
-  if(!dir.exists("plots/battery_percentage")){
-    dir.create("plots/battery_percentage")
+  if(!dir.exists("plots/battery_plots")){
+    dir.create("plots/battery_plots")
   }
   
   for(i in seq_along(dfList)){
@@ -292,7 +288,7 @@ plot_battery_percentage <- function(dfList) {
         panel.background = element_rect(fill = "white", color = NA)
       )
     
-    ggsave(filename = paste0("plots/battery_percentage/battery_percentage_plot_",df_name,".png"), plot = p, width = 10, height = 5)
+    ggsave(filename = paste0("plots/battery_plots/battery_percentage_plot_",df_name,".png"), plot = p, width = 10, height = 5)
   }
   }
 
@@ -322,7 +318,7 @@ plot_vwc <- function(dfList) {
         labs(title = paste("VWC -", df_name),
              x = "Date", 
              y = "VWC",
-             color = "VWC Variables")+
+             color = "TEROS 12")+
         theme_minimal()+
         theme(
         plot.background = element_rect(fill = "white", color = NA),
@@ -360,7 +356,7 @@ plot_matricpotential <- function(dfList) {
         labs(title = paste("Matric Potential -", df_name),
              x = "Date", 
              y = "Matric Potential",
-             color = "MP Variables")+
+             color = "TEROS 21")+
         theme_minimal()+
         theme(
         plot.background = element_rect(fill = "white", color = NA),
@@ -373,6 +369,43 @@ plot_matricpotential <- function(dfList) {
 
 plot_matricpotential(dfList)
 
+
+
+plot_soiltemperature <- function(dfList) {
+  if(!dir.exists("plots")){
+    dir.create("plots")
+  }
+  if(!dir.exists("plots/soiltemp_plots")) {
+    dir.create("plots/soiltemp_plots")
+    }
+ for(i in seq_along(dfList)){
+   df<- dfList[[i]]
+   df_name <- names(dfList)[i]
+   
+   st_columns <- grep("vwc_temp_C|matric_temp_C", names(df), value = TRUE, perl = TRUE)
+   if(length(st_columns)== 0) next
+      
+      df_melted<- df %>%
+      select(datetime, all_of(st_columns)) %>%
+      pivot_longer(cols = -datetime, names_to = "variable", values_to = "value")
+      
+      p<- ggplot(df_melted, aes(x = datetime, y = value, color = variable))+
+        geom_line()+
+        labs(title = paste("Soil Temperature -", df_name),
+             x = "Date", 
+             y = "Soil Temperature (C)",
+             color = "Soil Temp Sensor")+
+        theme_minimal()+
+        theme(
+        plot.background = element_rect(fill = "white", color = NA),
+        panel.background = element_rect(fill = "white", color = NA)
+      )
+     ggsave(filename = paste0("plots/soiltemp_plots/soiltemp_plot_", df_name, ".png"), plot = p, width = 10, height = 5)
+      }
+  
+}
+
+plot_soiltemperature(dfList)
 
 
 ```
