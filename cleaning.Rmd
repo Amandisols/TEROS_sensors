@@ -295,6 +295,7 @@ plot_battery_percentage <- function(dfList) {
 plot_battery_percentage(dfList)
 
 
+
 plot_vwc <- function(dfList) {
   if(!dir.exists("plots")){
     dir.create("plots")
@@ -407,6 +408,64 @@ plot_soiltemperature <- function(dfList) {
 
 plot_soiltemperature(dfList)
 
+
+
+plot_smreleasecurves <- function(dfList) {
+  if(!dir.exists("plots")){
+    dir.create("plots")
+  }
+  if(!dir.exists("plots/swrelease_plots")) {
+    dir.create("plots/swrelease_plots")
+    }
+ for(i in seq_along(dfList)){
+    df <- dfList[[i]]
+    df_name <- names(dfList)[i]
+    
+   mp_columns <- grep("matric_kPa_", names(df), value = TRUE)
+    vwc_columns <- grep("vwc_", names(df), value = TRUE)
+    
+    matched_columns <- list()
+    
+    for(mp_col in mp_columns) {
+      number <- sub("matric_kPa_(\\d+)", "\\1", mp_col)
+      for(vwc_col in vwc_columns) {
+        if(grepl(paste0("vwc_", number), vwc_col)) {
+          matched_columns[[length(matched_columns) + 1]] <- list(matric = mp_col, vwc = vwc_col)
+        }
+      }
+    }
+    
+    for(cols in matched_columns) {
+      mp_col <- cols$matric
+      vwc_col <- cols$vwc
+      
+      df_plot <- df[, c(mp_col, vwc_col)]
+      names(df_plot) <- c("matric_potential", "vwc")
+      
+      df_plot <- df_plot[!is.na(df_plot$matric_potential), ]
+      
+      df_plot$log_matric_potential<- log10(-df_plot$matric_potential)
+      
+      p <- ggplot(df_plot, aes(x = log_matric_potential, y = vwc)) +
+        geom_point() +
+        scale_x_log10() +
+        labs(title = paste("SM Release Curve (Matric Potential vs VWC) -", df_name, "-", sub("matric_kPa_", "", mp_col)),
+             x = "Matric Potential (-kPa)", 
+             y = "Volumetric Water Content (VWC)",
+             color = "Variable") +
+        theme_minimal() +
+        theme(
+          plot.background = element_rect(fill = "white", color = NA),
+          panel.background = element_rect(fill = "white", color = NA)
+        )+geom_smooth()
+        
+      plot(p)
+      ggsave(filename = paste0("plots/swrelease_plots/swrelease_plot_", df_name, "_", sub("matric_kPa_", "", mp_col), ".png"), plot = p, width = 10, height = 5)
+    }
+  }
+}
+
+plot_smreleasecurves(dfList)
 
 ```
 
