@@ -265,7 +265,7 @@ ggplot(test, aes(x= datetime))+
 
 ```
 
-## Plotting and exporting plots
+# Plot and export plots
 ```{r}
 
 plot_battery_percentage <- function(dfList) {
@@ -472,8 +472,7 @@ plot_smreleasecurves <- function(dfList) {
 
 plot_smreleasecurves(dfList)
 
-# should fit van genuchten curve
-
+# should fit van genuchten curve, geom_smooth may not be appropriate
 
 plot_sitemoisturedata <- function(dfList) {
   if (!dir.exists("plots")) {
@@ -527,7 +526,7 @@ plot_sitemoisturedata <- function(dfList) {
 
 plot_sitemoisturedata(dfList)
 
-
+# scales are off for secondary axes- must fix
 
 ```
 
