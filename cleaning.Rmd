@@ -4,6 +4,7 @@ author: "Amanda Pennino"
 date: "2023-11-14"
 output: html_document
 ---
+
 # Libraries and directories
 ```{r}
 library(readxl)
@@ -17,7 +18,7 @@ library(ggplot2)
 ## dir.create will not create/overwrite existing folder if warning shows.
 
 # CHANGE THIS DIRECTORY TO WHEREVER YOU STORED THE TEROS_sensors FILE:
-dir <- "~/projects/DSS/TEROS_sensors/Coweeta/" #Hubbard Brook or Coweeta directories
+# dir <- "~/projects/DSS/TEROS_sensors/Coweeta/" #Hubbard Brook or Coweeta directories
 
 raw_dir <- paste0(dir, "raw/") #Where raw files are in folders by download date
 
@@ -32,18 +33,18 @@ master_dir <- paste0(dir, "master/") #Clean files by location with all dates app
 meta <- read_csv(paste0(dir,"sensor_metadata.csv"))
 
 ```
+
 # Maps of sensor location
 ```{r}
 points = st_as_sf(meta, coords = c("lon", "lat"), crs = 4326)
 
-HubbardBrook <- st_read("~/projects/DSS/TEROS_sensors/HubbardBrook/shapefiles/hbef_wsheds.shp")
-Coweeta <- st_read("~/projects/DSS/TEROS_sensors/Coweeta/shapefiles/Coweeta_Hydrologic_Laboratory.shp")
+# HubbardBrook <- st_read("~/projects/DSS/TEROS_sensors/HubbardBrook/shapefiles/hbef_wsheds.shp")
+#Coweeta <- st_read("~/projects/DSS/TEROS_sensors/Coweeta/shapefiles/Coweeta_Hydrologic_Laboratory.shp")
 
 mapview(Coweeta, label = Coweeta$WS) +
   mapview(points, label = points$siteID) 
 ```
 
- 
 # Clean raw data and make sure metadata file has download dates and serial numbers filled out
 ```{r}
 
@@ -163,7 +164,6 @@ file_prefix
 file_prefix <- as.character(strsplit(file_prefix,"_"))
 file_prefix
 
-
 # NAMED LIST OF ROW-BINDED DATAFRAMES
 dfList <- sapply(file_prefix, function(p){
                 dfs <- lapply(list.files(path=read, 
@@ -174,7 +174,6 @@ dfList <- sapply(file_prefix, function(p){
                 do.call(rbind, dfs)  
                 
           }, simplify=FALSE)
-
 
 #remove duplicate rows, if whole downloads were made multiple times
 dfList <- lapply(dfList, function(x) x[!duplicated(x["datetime"]), ])
@@ -192,8 +191,8 @@ for(i in 1:length(dfList)){
 
 ```
 
-# Plot Some Data
-```{r}
+# Prepare for plotting
+```{r eval=FALSE, include=FALSE}
 read = master_dir
 
 file_prefix <- unique(sapply(list.files(path=read, recursive = TRUE, full.names = FALSE, pattern = "*.csv"), substr, 1, 5))
@@ -214,7 +213,10 @@ dfList <- sapply(file_prefix, function(p){
 
 #format datetime column
 dfList <- lapply(dfList, transform, datetime = as.POSIXct(datetime, format = "%Y-%m-%d %H:%M:%S"))
+```
 
+# Plot some data for testing
+```{r eval=FALSE, include=FALSE}
 test <- dfList$Cw32C
 
 #plot
@@ -263,6 +265,7 @@ ggplot(test, aes(x= datetime))+
 
 ```
 
+## Plotting and exporting plots
 ```{r}
 
 plot_battery_percentage <- function(dfList) {
@@ -287,7 +290,7 @@ plot_battery_percentage <- function(dfList) {
         plot.background = element_rect(fill = "white", color = NA),
         panel.background = element_rect(fill = "white", color = NA)
       )
-    
+    plot(p)
     ggsave(filename = paste0("plots/battery_plots/battery_percentage_plot_",df_name,".png"), plot = p, width = 10, height = 5)
   }
   }
@@ -325,6 +328,7 @@ plot_vwc <- function(dfList) {
         plot.background = element_rect(fill = "white", color = NA),
         panel.background = element_rect(fill = "white", color = NA)
       )
+      plot(p)
      ggsave(filename = paste0("plots/vwc_plots/vwc_plot_", df_name, ".png"), plot = p, width = 10, height = 5)
       }
   
@@ -363,6 +367,7 @@ plot_matricpotential <- function(dfList) {
         plot.background = element_rect(fill = "white", color = NA),
         panel.background = element_rect(fill = "white", color = NA)
       )
+      plot(p)
      ggsave(filename = paste0("plots/mp_plots/mp_plot_", df_name, ".png"), plot = p, width = 10, height = 5)
       }
   
@@ -399,8 +404,8 @@ plot_soiltemperature <- function(dfList) {
         theme_minimal()+
         theme(
         plot.background = element_rect(fill = "white", color = NA),
-        panel.background = element_rect(fill = "white", color = NA)
-      )
+        panel.background = element_rect(fill = "white", color = NA))
+      plot(p)
      ggsave(filename = paste0("plots/soiltemp_plots/soiltemp_plot_", df_name, ".png"), plot = p, width = 10, height = 5)
       }
   
@@ -466,6 +471,63 @@ plot_smreleasecurves <- function(dfList) {
 }
 
 plot_smreleasecurves(dfList)
+
+# should fit van genuchten curve
+
+
+plot_sitemoisturedata <- function(dfList) {
+  if (!dir.exists("plots")) {
+    dir.create("plots")
+  }
+  if (!dir.exists("plots/site_plots")) {
+    dir.create("plots/site_plots")
+  }
+
+  for (i in seq_along(dfList)) {
+    df <- dfList[[i]]
+    df_name <- names(dfList)[i]
+
+    mp_columns <- grep("matric_kPa_", names(df), value = TRUE)
+    vwc_columns <- grep("vwc_", names(df), value = TRUE)
+
+    if (length(mp_columns) > 0 && length(vwc_columns) > 0) {
+      df_long_vwc <- df %>%
+        pivot_longer(cols = all_of(vwc_columns), names_to = "variable", values_to = "value") %>%
+        mutate(type = "vwc")
+      
+      df_long_mp <- df %>%
+        pivot_longer(cols = all_of(mp_columns), names_to = "variable", values_to = "value") %>%
+        mutate(type = "matric_potential")
+
+      p <- ggplot() +
+        geom_line(data = df_long_vwc, aes(x = datetime, y = value, color = variable)) +
+        geom_line(data = df_long_mp, aes(x = datetime, y = value, color = variable), linetype = "dashed") +
+        scale_y_continuous(
+          name = "Volumetric Water Content (VWC)",
+  #        limits = c(0,0.5),
+          sec.axis = sec_axis(~., name = "Matric Potential (kPa)")
+        ) +
+        labs(title = paste("VWC and Matric Potential vs. DateTime -", df_name),
+             x = "DateTime",
+             color = "Variable") +
+        theme_minimal() +
+        theme(
+          plot.background = element_rect(fill = "white", color = NA),
+          panel.background = element_rect(fill = "white", color = NA),
+          axis.title.y.right = element_text(color = "red"),
+          axis.text.y.right = element_text(color = "red"),
+          axis.title.y.left = element_text(color = "blue"),
+          axis.text.y.left = element_text(color = "blue")
+        )
+      plot(p)
+      ggsave(filename = paste0("plots/site_plots/site_plot_", df_name, ".png"), plot = p, width = 10, height = 5)
+    }
+  }
+}
+
+plot_sitemoisturedata(dfList)
+
+
 
 ```
 
