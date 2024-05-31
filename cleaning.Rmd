@@ -42,7 +42,7 @@ points = st_as_sf(meta, coords = c("lon", "lat"), crs = 4326)
 #Coweeta <- st_read("~/projects/DSS/TEROS_sensors/Coweeta/shapefiles/Coweeta_Hydrologic_Laboratory.shp")
 
 mapview(Coweeta, label = Coweeta$WS) +
-  mapview(points, label = points$siteID) 
+  mapview(points, label = points$siteID, zcol = "logger", legend = TRUE) 
 ```
 
 # Clean raw data and make sure metadata file has download dates and serial numbers filled out
@@ -148,6 +148,7 @@ for (i in 1:length(file_list)) {
     write.csv(dat, paste0(out, site, "_", download_date, ".csv"))
     
 }
+
 
 ```
 
