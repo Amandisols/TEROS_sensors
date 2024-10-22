@@ -39,9 +39,10 @@ range_parameters <- data.frame(vars = c('vwc', 'vwc_temp', 'matric_kPa', 'matric
                                min = c(vwc_min, vwc_temp_min, matric_kPa_min, matric_temp_min, satext_min),
                                max = c(vwc_max, vwc_temp_max, matric_kPa_max, matric_temp_max, satext_max))
 
+
 # function - convert to time series --------------------------------------------
 
-## Step 1 of QAQC - creates rows for missing datetime values, fills datetime,
+## Step 1.1 of QAQC - creates rows for missing datetime values, fills datetime,
 ## and fills in the rest of the row with NA
 
 fill_datetimes <- function(df, datetime_col, step_flag) {
@@ -74,9 +75,10 @@ fill_datetimes <- function(df, datetime_col, step_flag) {
   return(merged_df)
 }
 
+
 # function - create QAQC and flag columns --------------------------------------
 
-## Step 1.1 of QAQC - no test applied here, just initiating columns in the df
+## Step 1.2 of QAQC - no test applied here, just initiating columns in the df
 
 create_qaqc_and_flag_columns <- function(df) {
   ## Don't make qaqc and flag cols for cols 1 and 2
@@ -106,20 +108,10 @@ create_qaqc_and_flag_columns <- function(df) {
 }
 
 
-# function - perform range test ------------------------------------------------
-
-## Step 2 of QAQC - remove data outside ranges set at top of script
-
-perform_range_test <- function(df, cols_to_test, range_min, range_max, step_flag) {
-  # define range constraints function and remove out of bounds values
-  constrain <- function(x) {ifelse(x < range_min | x > range_max, NA, x)}
-  df <- df %>% mutate(across(.cols = all_of(cols_to_test), .fns = constrain))
-  return(df)
-}
-
 # function - compare and flag --------------------------------------------------
 
-## Step 2.1 of QAQC - compare base columnd to QAQC columns and flag with step #
+## Flag failed QAQC tests - compare base to QAQC columns, flag with test numbers
+## this function will be used after each QAQC test
 
 compare_and_flag <- function(df, flag) {
   ## get the qaqc column names from the dataframe
@@ -136,6 +128,44 @@ compare_and_flag <- function(df, flag) {
   }
   return(df)
 }
+
+
+# function - perform range test ------------------------------------------------
+
+## Define function for Step 2 of QAQC - remove data outside set ranges 
+## this is nested within "range_test_and_flag"
+
+perform_range_test <- function(df, cols_to_test, range_min, range_max) {
+  # define range constraints function and remove out of bounds values
+  constrain <- function(x) {ifelse(x < range_min | x > range_max, NA, x)}
+  df <- df %>% mutate(across(.cols = all_of(cols_to_test), .fns = constrain))
+  return(df)
+}
+
+
+# function - range test and flag -----------------------------------------------
+
+## Step 2 of QAQC - apply range function and flag where data was removed
+
+range_test_and_flag <- function(df, cols, parameters, flag) {
+  ## initiate range_tested df to loop over
+  df_range_tested <- df
+  ## loop through variable types and apply ranges set in range_parameters df
+  for(i in 1:length(parameters$vars)){
+    ## get the col names of each variable type
+    test_var <- parameters$vars[i]
+    var_to_constrain <- cols[[test_var]]
+    ## remove values outside of range limits set for each variable 
+    df_range_tested <- perform_range_test(df_range_tested, var_to_constrain,
+                                          parameters$min[i],
+                                          parameters$max[i])
+  }
+  ## add the flag for range test to flag columns
+  flagged_df <- compare_and_flag(df_range_tested, flag)
+  return(flagged_df)
+}
+
+
 
 # function - persistence test --------------------------------------------------
 

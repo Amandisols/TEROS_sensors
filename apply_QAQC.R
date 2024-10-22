@@ -13,37 +13,33 @@ data_qaqc_flags <- create_qaqc_and_flag_columns(data_datetimes_filled)
 
 
 # get the column names for each observation type in a list ---------------------
+  ## if you dont want to apply tests to a var, you can comment it out! 
 
 ## volumetric water content
 vwc <- names(data_qaqc_flags)[grepl("^vwc", names(data_qaqc_flags)) & 
-                                     !grepl("^vwc_temp", names(data_qaqc_flags)) & 
-                                     grepl("qaqc", names(data_qaqc_flags))]
+                                !grepl("^vwc_temp", names(data_qaqc_flags)) & 
+                                grepl("qaqc", names(data_qaqc_flags))]
 ## vwc temperature
 vwc_temp <- names(data_qaqc_flags)[grepl("^vwc_temp", names(data_qaqc_flags)) & 
                                      grepl("qaqc", names(data_qaqc_flags))]
 ## matric kPa
 matric_kPa <- names(data_qaqc_flags)[grepl("^matric_kPa", names(data_qaqc_flags)) & 
-                                     grepl("qaqc", names(data_qaqc_flags))]
+                                       grepl("qaqc", names(data_qaqc_flags))]
 ## matric temperature
 matric_temp <- names(data_qaqc_flags)[grepl("^matric_temp", names(data_qaqc_flags)) & 
-                                     grepl("qaqc", names(data_qaqc_flags))]
+                                        grepl("qaqc", names(data_qaqc_flags))]
 ## electrical conductivity
 satext <- names(data_qaqc_flags)[grepl("^satext", names(data_qaqc_flags)) & 
-                                     grepl("qaqc", names(data_qaqc_flags))]
+                                   grepl("qaqc", names(data_qaqc_flags))]
 
 ## bind lists of colnames into list
-list_of_var_cols <- list(vwc, vwc_temp, matric_kPa, matric_temp, satext)
-var_to_constrain <- unlist(list_of_var_cols[1])
+list_of_var_cols <- list(vwc = vwc, 
+                         vwc_temp = vwc_temp, 
+                         matric_kPa = matric_kPa, 
+                         matric_temp = matric_temp, 
+                         satext = satext)
+
 
 # perform the range test -------------------------------------------------------
-
-## loop through variable types and apply ranges set in range_parameters df
-for(i in length(range_parameters$vars)){
-var_to_constrain <- unlist(list_of_var_cols[range_parameters$vars[i]])
-data_range_tested <- perform_range_test(data_qaqc_flags, var_to_constrain,
-                                      range_parameters$min[i],
-                                      range_parameters$max[i])
-}
-
-## add the flag for range test to flag columns
-data_range_flagged <- compare_and_flag(data_range_tested, flag_range)
+data_range_flagged <- range_test_and_flag(data_qaqc_flags, list_of_var_cols,
+                                          range_parameters, flag_range)
