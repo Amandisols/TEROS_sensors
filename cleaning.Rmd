@@ -16,154 +16,172 @@ To do:
 library(readxl)
 library(tidyverse)
 library(lubridate)
+library(futile.logger)
+library(progress)
 
-# Directories
-## dir.create will not create/overwrite existing folder if warning shows.
 
 # CHANGE THIS DIRECTORY TO WHEREVER YOU STORED THE TEROS_sensors FILE:
-dir <- "~/projects/DSS/TEROS_sensors/Coweeta/" #Hubbard Brook or Coweeta directories
+dir <- "C:/GitHub/TEROS_sensors/HubbardBrook/" #Hubbard Brook or Coweeta directories
+
+
+
+
+# Directories ------------------------------------------------------------------
+## dir.create will not create/overwrite existing folder if warning shows.
+
+### HOUSE directory creation in an if else statement!
+### add logger message whether it is created or not
 
 raw_dir <- paste0(dir, "raw/") #Where raw files are in folders by download date
 
-dir.create(file.path(dir, "clean"), showWarnings = TRUE) 
+dir.create(file.path(dir, "clean"), showWarnings = TRUE) # why do we want the warnings?
 clean_dir <- paste0(dir, "clean/") #Clean files by download date
 
 dir.create(file.path(dir, "master"), showWarnings = TRUE)
 master_dir <- paste0(dir, "master/") #Clean files by location with all dates appended
 
 
-# Metadata file structure
+# Metadata file structure ------------------------------------------------------
 ## columns needed: loggerID, site, depth_cm, duplicate_depth, serial 
-meta <- read_csv(paste0(dir,"sensor_metadata.csv"))
+meta <- suppressMessages(read_csv(paste0(dir,"sensor_metadata.csv")))
 
 ```
-
-
-# Maps of sensor location
-```{r}
-library(sf)
-library(mapview)
-
-points = st_as_sf(meta, coords = c("lon", "lat"), crs = 4326)
-
-HubbardBrook <- st_read("~/projects/DSS/TEROS_sensors/HubbardBrook/shapefiles/hbef_wsheds.shp")
-Coweeta <- st_read("~/projects/DSS/TEROS_sensors/Coweeta/shapefiles/Coweeta_Hydrologic_Laboratory.shp")
-
-mapview(Coweeta, label = Coweeta$WS) +
-  mapview(points, label = points$siteID) 
-
-```
-
 
 # Clean raw data
 ## Make sure metadata file has download dates and serial numbers filled out
 ```{r}
 
-out = clean_dir
+# is there a syntax reason for using = for attribution at the beginning of chunks?
+out <- clean_dir 
 
-file_list <- list.files(path=raw_dir, full.names = TRUE, recursive = TRUE) 
+file_list <- list.files(path = raw_dir, full.names = TRUE, recursive = TRUE) 
 
-
-for (i in 1:length(file_list)) {
-    
-    #Read in the raw data
-    dat <- read_excel(file_list[i], col_names = FALSE, skip= 3)
-    
-    #Create a log of logger serial numbers and what it is measuring
-    log <- read_excel(file_list[i], sheet = "Metadata")
-    
-    loggerID <- subset(log, log$`Device Name` == "Serial Number")
-    loggerID <- as.character(loggerID[1,3])
-    
-    date <- subset(log, log$`Device Name` == "Logger Time")
-    date <- as.Date(as.character(date[1,3]), "%m/%d/%y")
-    mo <- as.character(month(as.POSIXlt(date, format="%d/%m/%Y"), label = T))
-    yr <- as.character(year(as.POSIXlt(date, format="%d/%m/%Y")))
-    download_date = paste0(mo, yr)
-    
-    row <- as.numeric(which(grepl("Sensors", log$Configuration)))
-  
-    log <- log %>% 
-      slice(row:nrow(log)) %>%
-      filter(`Device Name` %in% c("Port #", "Name", "Serial Num", "Serial Number")) %>%
-      select(-Configuration) 
-  
-    names(log)[1] = "key"
-    names(log)[2] = "value"
-    log[is.na(log)] <- "9999"
-    log <- do.call(data.frame, aggregate(. ~ key, log, as.vector))
-    log <- as.data.frame(t(log))
-    colnames(log) <- log[1,]
-    log <- log[-1,]
-    log$model <- word(log$Name, start = 1, end = 2)
-  
-    log <- log  %>%
-      mutate(meas = if_else(model == "TEROS 21", 
-                            list(c("matric_kPa", "matric_temp_C")), 
-                            list(c("vwc", "vwc_temp_C", "satext_mScm")))) %>%
-      unnest(meas) 
-    
-    names(log)[3] <- "serial"
-  
-    
-    #Headers of the datafile
-    header <- read_excel(file_list[i], col_names = FALSE)
-    header <- header[c(1:3),]
-    header <- as.data.frame(t(header))
-    names(header)[1] = "port"
-    names(header)[2] = "model"
-    names(header)[3] = "meas"
-    
-    
-    #unique(header$meas)
-    header$meas <- ifelse(header$meas == "Timestamp", "datetime", header$meas)
-    header$meas <- ifelse(header$meas == "kPa Matric Potential", "matric_kPa", header$meas)
-    header$meas <- ifelse(header$meas == "°C Soil Temperature" & header$model == "TEROS 12", "vwc_temp_C", header$meas)
-    header$meas <- ifelse(header$meas == "°C Soil Temperature" & header$model == "TEROS 21", "matric_temp_C", header$meas)
-    header$meas <- ifelse(header$meas == "m³/m³ Water Content", "vwc", header$meas)
-    header$meas <- ifelse(header$meas == "mS/cm Saturation Extract EC", "satext_mScm", header$meas)
-    header$meas <- ifelse(header$meas == "mS/cm Bulk EC", "satext_mScm", header$meas)
-    header$meas <- ifelse(header$meas == "% Battery Percent",  paste0("logger", "_", "battPerc"), header$meas)
-    header$meas <- ifelse(header$meas == "mV Battery Voltage",  paste0("logger", "_", "battVolt"), header$meas)
-    header$meas <- ifelse(header$meas == "kPa Reference Pressure",  paste0("logger", "_", "refPress"), header$meas)
-    header$meas <- ifelse(header$meas == "°C Logger Temperature",  paste0("logger", "_", "tempC"), header$meas)
-  
-    
-    #join metadata with log to get depths of the sensors
-    metaL <- meta
-    metaL <- metaL %>% filter(logger == loggerID)
-    
-    #Site id
-    site <- as.character(na.omit(unique(metaL$siteID)))
-    
-    my_cols <- c("depth_cm", "duplicate_depth")
-    metaL$dup_depth <- do.call(paste, c(metaL[my_cols], sep = ""))
-    metaL <- metaL %>% select(siteID, logger, serial, dup_depth) 
-    
-    log <- left_join(log, metaL, by = "serial")
-    names(log)[2] = "port"
-    log$port <- as.numeric(log$port)
-    
-    #port
-    header$port <- as.numeric(str_extract(header$port, "\\d"))
-    header$port <- ifelse(header$meas == "datetime", NA, header$port)
-    
-    #join log with header information
-    header <- left_join(header, log, by = c("port", "meas"))
-    
-    my_cols <- c("meas", "dup_depth")
-    header$colnames <- do.call(paste, c(header[my_cols], sep = "_"))
-    header$colnames <- gsub("_NA", "",header$colname)
-    header$colnames <- gsub("NA", "",header$colname)  
-    
-    
-    #Change the column names and write out
-    colnames <- header$colnames
-    names(dat) <- c(colnames)
-    
-    write.csv(dat, paste0(out, site, "_", download_date, ".csv"))
-    
+if (length(file_list) == 0) {
+  flog.error("No files found in the raw directory.")
+} else {
+  flog.info(paste(length(file_list), "files loaded successfully."))
 }
+
+flog.info("Beginning to restructure files found in raw directory -- ")
+
+pb <- progress_bar$new(
+  format = "Processing files [:bar] :percent :elapsed",
+  total = length(file_list), 
+  clear = FALSE, 
+  width = 60
+)
+  
+for (i in 1:length(file_list)) {
+  
+  #Read in the raw data
+     dat <- suppressMessages(read_excel(file_list[i], col_names = FALSE, skip = 3))
+     log <- suppressMessages(read_excel(file_list[i], col_names = FALSE, sheet = "Metadata"))
+  header <- suppressMessages(read_excel(file_list[i], col_names = FALSE))
+  
+  if (!exists("log")) {
+    flog.error(paste("Warning: File", str_extract(file_list[i], "[^/]+$"), "in raw directory", 
+                  "does not contain a 'Metadata' sheet."))}
+
+  # New version is dynamic to whatever column contains "Device Name"
+  # in case of irregularities in file structure
+  dev_col <- which(sapply(log, function(x) any(grepl("Device Name", x))))
+  dev_col_name <- names(dev_col)
+  
+  # get logger ID 
+  loggerID <- subset(log, log[[dev_col]] == "Device Name") %>% pull(dev_col+1) 
+  
+  # get date and format download date string
+  date <- subset(log, log[[dev_col]] == "Logger Time") %>% 
+    pull(dev_col +1) %>% as.Date(., "%m/%d/%y")
+  mo <- as.character(month(as.POSIXlt(date, format="%d/%m/%Y"), label = T))
+  yr <- as.character(year(as.POSIXlt(date, format="%d/%m/%Y")))
+  download_date = paste0(mo, yr)
+  
+  # get port numbers, names, and serial numbers
+  row <- as.numeric(which(grepl("Sensors", log[[dev_col-1]]))) ### can i make a warning here if this does not exist??? if is.null(row)
+  col_keep <- c(dev_col_name, names(log)[dev_col+1])
+  log <- log %>% 
+    slice(row:nrow(log)) %>%
+    filter(.[[dev_col]] %in% c("Port #", "Name", "Serial Num", "Serial Number")) %>%
+    select(all_of(col_keep))
+  
+  # aggregate and reformat dataframe
+  names(log) <- c("key", "value")
+  log[is.na(log)] <- "9999"
+  log <- do.call(data.frame, aggregate(. ~ key, log, as.vector))
+  log <- as.data.frame(t(log[,-1]))
+  names(log) <- c("name", "port", "serial")
+  log$port <- as.numeric(log$port)
+  
+  # separate model ID from full device name
+  log$model <- word(log$name, start = 1, end = 2)
+  
+  # add measurement types for each model (this also resets row names)
+  log <- log %>%
+    mutate(meas = if_else(model == "TEROS 21", 
+                          list(c("matric_kPa", "matric_temp_C")), 
+                          list(c("vwc", "vwc_temp_C", "satext_mScm")))) %>%
+    unnest(meas) 
+  
+  
+  #Headers of the datafile -------------------------------------------------------
+  header <- header[c(1:3),]
+  header <- as.data.frame(t(header))
+  names(header) <- c("port", "model", "meas")
+  
+  #unique(header$meas) - swap out strings for r compatible col names
+  header$meas <- ifelse(header$meas == "Timestamp", "datetime", header$meas)
+  header$meas <- ifelse(header$meas == "kPa Matric Potential", "matric_kPa", header$meas)
+  header$meas <- ifelse(header$meas == "°C Soil Temperature" & header$model == "TEROS 12", "vwc_temp_C", header$meas)
+  header$meas <- ifelse(header$meas == "°C Soil Temperature" & header$model == "TEROS 21", "matric_temp_C", header$meas)
+  header$meas <- ifelse(header$meas == "m³/m³ Water Content", "vwc", header$meas)
+  header$meas <- ifelse(header$meas == "mS/cm Saturation Extract EC", "satext_mScm", header$meas)
+  header$meas <- ifelse(header$meas == "mS/cm Bulk EC", "satext_mScm", header$meas)
+  header$meas <- ifelse(header$meas == "% Battery Percent",  paste0("logger", "_", "battPerc"), header$meas)
+  header$meas <- ifelse(header$meas == "mV Battery Voltage",  paste0("logger", "_", "battVolt"), header$meas)
+  header$meas <- ifelse(header$meas == "kPa Reference Pressure",  paste0("logger", "_", "refPress"), header$meas)
+  header$meas <- ifelse(header$meas == "°C Logger Temperature",  paste0("logger", "_", "tempC"), header$meas)
+  
+  #join metadata with log to get depths of the sensors
+  metaL <- meta %>% filter(logger == loggerID)
+  
+  #Site id
+  site <- as.character(na.omit(unique(metaL$siteID)))
+  my_cols <- c("depth_cm", "duplicate_depth")
+  metaL$dup_depth <- do.call(paste, c(metaL[my_cols], sep = ""))
+  metaL <- metaL %>% select(siteID, logger, serial, dup_depth) 
+  
+  log <- left_join(log, metaL, by = "serial")
+  
+  #port
+  header$port <- as.numeric(str_extract(header$port, "\\d"))
+  header$port <- ifelse(header$meas == "datetime", NA, header$port)
+  
+  #join log with header information
+  header <- left_join(header, log, by = c("port", "meas"))
+  
+  my_cols <- c("meas", "dup_depth")
+  header$colnames <- do.call(paste, c(header[my_cols], sep = "_"))
+  header$colnames <- gsub("_NA", "",header$colname)
+  header$colnames <- gsub("NA", "",header$colname)  
+  
+  
+  #Change the column names and write out
+  colnames <- header$colnames
+  names(dat) <- c(colnames)
+  
+  #Ensure dates are written to CSV correctly
+  dat$datetime <- format(dat$datetime, "%Y-%m-%d %H:%M:%S")
+  
+  #Write to csv
+  write.csv(dat, paste0(out, site, "_", download_date, ".csv"), row.names = FALSE)
+  
+  #Progress bar to display file processing
+  pb$tick(tokens = list(file = i))
+
+}
+
+flog.info("Raw file restructuring complete!")
 
 ```
 
@@ -171,18 +189,52 @@ for (i in 1:length(file_list)) {
 # Combine all download dates
 ```{r}
 
-read = clean_dir
-out = master_dir
+read <- clean_dir
+out <- master_dir
 
-
-file_prefix <- unique(sapply(list.files(path=read, recursive = TRUE, full.names = FALSE, pattern = "*.csv"), substr, 1, 5))  
-file_prefix
-
+file_prefix <- unique(sapply(list.files(path=read, 
+                                        recursive = TRUE, 
+                                        full.names = FALSE, 
+                                        pattern = "*.csv"), substr, 1, 5))  
 file_prefix <- as.character(strsplit(file_prefix,"_"))
-file_prefix
-
 
 # NAMED LIST OF ROW-BINDED DATAFRAMES
+dfList <- sapply(file_prefix, function(p){
+   dfs <- lapply(list.files(path=read, 
+                            pattern=p, 
+                            full.names=TRUE), function(f){read.csv(f)})   
+  do.call(rbind, dfs)  
+}, simplify=FALSE)
+
+#remove duplicate rows, if whole downloads were made multiple times
+dfList <- lapply(dfList, function(x) x[!duplicated(x["datetime"]), ])
+
+## remove erroneous date values by filtering out dates past today
+dfList <- lapply(dfList, function(df) df[df$datetime <= Sys.Date(),])
+
+for(i in 1:length(dfList)){
+  dfList[[i]] <- dfList[[i]][order(dfList[[i]]$datetime),]
+  write.csv(dfList[[i]], paste0(out, names(dfList)[i], ".csv"), row.names = FALSE)
+}
+
+flog.info("Separate download dates combined!")
+
+```
+
+
+
+
+
+# from carlos -- Prepare for plotting
+```{r eval=FALSE, include=FALSE}
+read <- master_dir
+
+file_prefix <- unique(sapply(list.files(path=read, recursive = TRUE, full.names = FALSE, pattern = "*.csv"), substr, 1, 5))
+file_prefix
+
+file_prefix <- str_replace(file_prefix, "([.])", "")
+file_prefix
+
 dfList <- sapply(file_prefix, function(p){
                 dfs <- lapply(list.files(path=read, 
                                          pattern=p, full.names=TRUE), function(f) {
@@ -193,31 +245,70 @@ dfList <- sapply(file_prefix, function(p){
                 
           }, simplify=FALSE)
 
-
-#remove duplicate rows, if whole downloads were made multiple times
-dfList <- lapply(dfList, function(x) x[!duplicated(x["datetime"]), ])
-
 #format datetime column
 dfList <- lapply(dfList, transform, datetime = as.POSIXct(datetime, format = "%Y-%m-%d %H:%M:%S"))
+```
 
 
+# from carlos -- Plot some data for testing
+```{r eval=FALSE, include=FALSE}
+test <- dfList$Cw32C
 
-for(i in 1:length(dfList)){
-  
-  write.csv(dfList[[i]], paste0(out ,names(dfList)[i], ".csv"), row.names = FALSE)
-}
+#plot
+plot(test$datetime, test$vwc_79, type = "p", pch=20)
 
+##ggplot VWC
+ggplot(test, aes(x= datetime))+
+  geom_line(aes(y= vwc_79), color = "black")+
+  geom_line(aes(y= vwc_50a), color = "#d7191c")+
+  geom_line(aes(y= vwc_50b), color = "#e66101")+
+  geom_line(aes(y= vwc_15), color = "#2c7bb6")+
+  xlab("Date")+
+  ylab("Volumetric Water Content")+
+  ggtitle("VWC CW32C")+
+  theme_minimal()
+
+##ggplot MP  
+ggplot(test, aes(x= datetime, y = matric_kPa_79))+
+  geom_line()+
+  geom_line(aes(y= matric_kPa_15), color = "#d7191c")+
+  xlab("Date")+
+  ylab("kPa")+
+  ggtitle("Matric Potential CW32C")+
+   theme_minimal()
+
+##ggplot Soil Temperature
+ggplot(test, aes(x= datetime))+
+  geom_line(aes(y= matric_temp_C_79), color = "green")+
+  geom_line(aes(y= vwc_temp_C_79), color = "black")+
+  geom_line(aes(y= vwc_temp_C_50a), color = "#d7191c")+
+  geom_line(aes(y= vwc_temp_C_50b), color = "#e66101")+
+  geom_line(aes(y= matric_temp_C_15), color = "#2c7bb6")+
+  geom_line(aes(y= vwc_temp_C_15), color = "blue")+
+  xlab("Date")+
+  ylab("°C")+
+  ggtitle("Soil Temperature CW32C")+
+  theme_minimal()
+
+##ggplot Battery Status   
+ggplot(test, aes(x= datetime))+
+  geom_line(aes(y=logger_battPerc))+
+  xlab("Date")+
+  ylab("Battery Percentage")+
+  ggtitle("Battery CW32C")+
+   theme_minimal()
 
 ```
 
 
-
-
-#Below this is just me playing around
+#Amanda's code snippets
 ```{r}
 read = master_dir
 
-file_prefix <- unique(sapply(list.files(path=read, recursive = TRUE, full.names = FALSE, pattern = "*.csv"), substr, 1, 5))  
+file_prefix <- unique(sapply(list.files(path=read, 
+                                        recursive = TRUE, 
+                                        full.names = FALSE, 
+                                        pattern = "*.csv"), substr, 1, 5))  
 file_prefix
 
 file_prefix <- str_replace(file_prefix, "([.])", "")
